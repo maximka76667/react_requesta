@@ -12,7 +12,7 @@ function App() {
     >
       <div className="flex p-6 items-center">
         <Select
-          color="blue-gray"
+          color="purple"
           onChange={(e) => console.log(e)}
           variant="outlined"
           label="Method"
@@ -25,12 +25,13 @@ function App() {
         </Select>
         <div className="w-72">
           <Input
+            color="light-blue"
             label="https://example.com"
             className="px-3 text-base"
             variant="outlined"
           />
         </div>
-        <Button type="submit" color="blue-gray">
+        <Button type="submit" color="deep-purple">
           Send
         </Button>
       </div>
