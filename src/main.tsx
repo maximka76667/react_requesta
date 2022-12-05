@@ -9,7 +9,7 @@ const theme = {
       base: {
         container: {
           position: "relative",
-          minWidth: "min-w-[200px]",
+          minWidth: "min-w-[100px]",
         },
       },
     },
