@@ -1,1 +1,1 @@
-export { default as Param } from "./Param";
+export { default as Pair } from "./Pair";

@@ -12,13 +12,16 @@
     "@material-tailwind/react": "^1.2.4",
     "@uiw/codemirror-extensions-langs": "^4.17.1",
     "@uiw/react-codemirror": "^4.17.1",
+    "axios": "^1.2.1",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@codemirror/lang-json": "^6.0.1",
     "@types/react": "^18.0.24",
     "@types/react-dom": "^18.0.8",
+    "@types/uuid": "^9.0.0",
     "@vitejs/plugin-react": "^2.2.0",
     "autoprefixer": "^10.4.13",
     "postcss": "^8.4.19",
