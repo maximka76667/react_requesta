@@ -40,20 +40,20 @@ function App() {
     }, {});
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     console.log(convertPairs(params));
     console.log(convertPairs(headers));
 
-    axios({
+    const response = await axios({
       url,
       method,
       params: convertPairs(params),
       headers: convertPairs(headers),
-    }).then((res) => {
-      console.log(res);
-      setResponse(res);
     });
+
+    console.log(response);
+    setResponse(response);
   }
 
   // Creates a pair template with id
