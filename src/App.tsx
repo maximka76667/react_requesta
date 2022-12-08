@@ -235,7 +235,7 @@ function App() {
             <p>Time: {responseTime} ms</p>
             <p>Size: {responseSize}</p>
           </div>
-          <Tabs value="params">
+          <Tabs value="response-body">
             <TabsHeader>
               <Tab value="response-body">Body</Tab>
               <Tab value="response-headers">Headers</Tab>
