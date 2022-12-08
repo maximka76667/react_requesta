@@ -9,13 +9,15 @@ import {
   Tab,
   TabPanel,
 } from "@material-tailwind/react";
-import ReactCodeMirror from "@uiw/react-codemirror";
+import ReactCodeMirror, { basicSetup } from "@uiw/react-codemirror";
 import { json as jsonLang } from "@codemirror/lang-json";
 import { FormEvent, useState } from "react";
-import { Pair } from "./components";
+import { Pair, ResponsePair } from "./components";
 import { IPairWithId, IPair } from "./interfaces";
 import { v4 as uuidv4 } from "uuid";
-import axios, { AxiosResponse } from "axios";
+import axios, { AxiosResponse, AxiosResponseHeaders } from "axios";
+import prettyBytes from "pretty-bytes";
+import { EditorView } from "@codemirror/view";
 
 const options = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
@@ -32,6 +34,24 @@ function App() {
   const [headers, setHeaders] = useState<IPairWithId[]>([]);
 
   const [response, setResponse] = useState<AxiosResponse<any, any>>();
+  const [responseBody, setResponseBody] = useState(jsonDefaultValue);
+  const [responseHeaders, setResponseHeaders] = useState<IPairWithId[]>([]);
+  const [responseTime, setResponseTime] = useState(0);
+  const [responseSize, setResponseSize] = useState("");
+
+  type TResponseHeaders =
+    | AxiosResponseHeaders
+    | Partial<
+        Record<string, string | number> & {
+          "set-cookie"?: string[] | undefined;
+        }
+      >;
+
+  function convertHeaders(headers: TResponseHeaders) {
+    return Object.keys(headers).reduce((array: any[], key) => {
+      return [...array, { _id: uuidv4(), key, value: headers[key] }];
+    }, []);
+  }
 
   function convertPairs(pairs: IPairWithId[]) {
     return pairs.reduce((object, { _id, ...pair }) => {
@@ -45,15 +65,31 @@ function App() {
     console.log(convertPairs(params));
     console.log(convertPairs(headers));
 
+    setResponse(undefined);
+    setResponseHeaders([]);
+    setResponseBody(jsonDefaultValue);
+
+    const startTime = new Date().getTime();
+
     axios({
       url,
       method,
       params: convertPairs(params),
       headers: convertPairs(headers),
-    }).then((res) => {
-      console.log(res);
-      setResponse(res);
-    });
+    })
+      .catch((e) => e.response)
+      .then((res) => {
+        const endTime = new Date().getTime();
+        setResponse(res);
+        setResponseHeaders(convertHeaders(res.headers));
+        setResponseBody(JSON.stringify(res.data, null, 2));
+        setResponseTime(endTime - startTime);
+        setResponseSize(
+          prettyBytes(
+            JSON.stringify(res.data).length + JSON.stringify(res.headers).length
+          )
+        );
+      });
   }
 
   // Creates a pair template with id
@@ -182,7 +218,7 @@ function App() {
               <TabPanel value="json">
                 <ReactCodeMirror
                   value={json}
-                  extensions={[jsonLang()]}
+                  extensions={[basicSetup(), jsonLang()]}
                   onChange={(value, viewUpdate) => setJson(value)}
                 />
               </TabPanel>
@@ -190,10 +226,39 @@ function App() {
           </Tabs>
         </div>
       </form>
-      {response && (
+      {response !== undefined && (
         <div>
           <h2>Response</h2>
-          <p>{response.status}</p>
+          <div className="flex gap-5">
+            <p>Status: {response.status}</p>
+            <p>Time: {responseTime} ms</p>
+            <p>Size: {responseSize}</p>
+          </div>
+          <Tabs value="params">
+            <TabsHeader>
+              <Tab value="response-body">Body</Tab>
+              <Tab value="response-headers">Headers</Tab>
+            </TabsHeader>
+            <TabsBody>
+              <TabPanel value="response-body">
+                <ReactCodeMirror
+                  value={responseBody}
+                  extensions={[
+                    basicSetup(),
+                    jsonLang(),
+                    EditorView.editable.of(false),
+                  ]}
+                />
+              </TabPanel>
+              <TabPanel value="response-headers" className="flex">
+                <div className="grid grid-cols-2 p-2 gap-x-5">
+                  {responseHeaders.map(({ _id, ...pair }) => {
+                    return <ResponsePair key={_id} pair={pair} />;
+                  })}
+                </div>
+              </TabPanel>
+            </TabsBody>
+          </Tabs>
         </div>
       )}
     </div>
