@@ -76,6 +76,7 @@ function App() {
       method,
       params: convertPairs(params),
       headers: convertPairs(headers),
+      data: JSON.parse(json),
     })
       .catch((e) => e.response)
       .then((res) => {
