@@ -8,36 +8,85 @@ import {
   TabsBody,
   Tab,
   TabPanel,
+  Alert,
 } from "@material-tailwind/react";
 import ReactCodeMirror, { basicSetup } from "@uiw/react-codemirror";
 import { json as jsonLang } from "@codemirror/lang-json";
 import { FormEvent, useState } from "react";
-import { Pair, ResponsePair } from "./components";
+import { Pair, RequestGridTabPanel, ResponsePair } from "./components";
 import { IPairWithId, IPair } from "./interfaces";
 import { v4 as uuidv4 } from "uuid";
 import axios, { AxiosResponse, AxiosResponseHeaders } from "axios";
 import prettyBytes from "pretty-bytes";
 import { EditorView } from "@codemirror/view";
+import { noctisLilac } from "@uiw/codemirror-theme-noctis-lilac";
 
 const options = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
 function App() {
   const defaultSelectValue = options[0];
-  const jsonDefaultValue = `{\n\t\n}`;
+  const defaultJsonValue = `{\n\t\n}`;
 
-  const [method, setMethod] = useState(defaultSelectValue);
-  const [url, setUrl] = useState(
+  const [requestMethod, setRequestMethod] = useState(defaultSelectValue);
+  const [requestUrl, setRequestUrl] = useState(
     "https://jsonplaceholder.typicode.com/todos/1"
   );
-  const [json, setJson] = useState(jsonDefaultValue);
-  const [params, setParams] = useState<IPairWithId[]>([]);
-  const [headers, setHeaders] = useState<IPairWithId[]>([]);
+
+  const [requestParams, setRequestParams] = useState<IPairWithId[]>([
+    { _id: uuidv4() },
+  ]);
+  const [requestHeaders, setRequestHeaders] = useState<IPairWithId[]>([
+    { _id: uuidv4() },
+  ]);
+  const [requestJson, setRequestJson] = useState(defaultJsonValue);
+  const [requestJsonErrorMessage, setRequestJsonErrorMessage] = useState("");
 
   const [response, setResponse] = useState<AxiosResponse<any, any>>();
-  const [responseBody, setResponseBody] = useState(jsonDefaultValue);
+  const [responseBody, setResponseBody] = useState(defaultJsonValue);
   const [responseHeaders, setResponseHeaders] = useState<IPairWithId[]>([]);
   const [responseTime, setResponseTime] = useState(0);
   const [responseSize, setResponseSize] = useState("");
+
+  const requestTabs = [
+    {
+      id: "params",
+      title: "Query params",
+      className: "flex justify-center",
+      element: (
+        <RequestGridTabPanel
+          pairs={requestParams}
+          handlePairDelete={handleParamDelete}
+          handlePairChange={handleParamChange}
+          handlePairAdd={handleAddParam}
+        />
+      ),
+    },
+    {
+      id: "headers",
+      title: "Headers",
+      className: "flex justify-center",
+      element: (
+        <RequestGridTabPanel
+          pairs={requestHeaders}
+          handlePairAdd={handleAddHeader}
+          handlePairChange={handleHeaderChange}
+          handlePairDelete={handleHeaderDelete}
+        />
+      ),
+    },
+    {
+      id: "json",
+      title: "JSON",
+      element: (
+        <ReactCodeMirror
+          theme={noctisLilac}
+          value={requestJson}
+          extensions={[basicSetup(), jsonLang()]}
+          onChange={(value) => setRequestJson(value)}
+        />
+      ),
+    },
+  ];
 
   type TResponseHeaders =
     | AxiosResponseHeaders
@@ -62,21 +111,30 @@ function App() {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    console.log(convertPairs(params));
-    console.log(convertPairs(headers));
+    console.log(convertPairs(requestParams));
+    console.log(convertPairs(requestHeaders));
 
     setResponse(undefined);
     setResponseHeaders([]);
-    setResponseBody(jsonDefaultValue);
+    setResponseBody(defaultJsonValue);
+    setRequestJsonErrorMessage("");
 
     const startTime = new Date().getTime();
 
+    let data;
+    try {
+      data = JSON.parse(requestJson || defaultJsonValue);
+    } catch (e) {
+      setRequestJsonErrorMessage("You have to insert valid JSON");
+      return;
+    }
+
     axios({
-      url,
-      method,
-      params: convertPairs(params),
-      headers: convertPairs(headers),
-      data: JSON.parse(json),
+      url: requestUrl,
+      method: requestMethod,
+      params: convertPairs(requestParams),
+      headers: convertPairs(requestHeaders),
+      data,
     })
       .catch((e) => e.response)
       .then((res) => {
@@ -101,12 +159,12 @@ function App() {
 
   function handleAddParam() {
     const newParam = createPair();
-    setParams([...params, newParam]);
+    setRequestParams([...requestParams, newParam]);
   }
 
   function handleAddHeader() {
     const newHeader = createPair();
-    setHeaders([...headers, newHeader]);
+    setRequestHeaders([...requestHeaders, newHeader]);
   }
 
   function updatePair(pairs: IPairWithId[], id: string, pair: IPair) {
@@ -117,13 +175,13 @@ function App() {
   }
 
   function handleParamChange(id: string, pair: IPair) {
-    const newParams = updatePair(params, id, pair);
-    setParams([...newParams]);
+    const newParams = updatePair(requestParams, id, pair);
+    setRequestParams([...newParams]);
   }
 
   function handleHeaderChange(id: string, pair: IPair) {
-    const newHeaders = updatePair(headers, id, pair);
-    setHeaders([...newHeaders]);
+    const newHeaders = updatePair(requestHeaders, id, pair);
+    setRequestHeaders([...newHeaders]);
   }
 
   function deletePair(pairs: IPairWithId[], id: string) {
@@ -133,25 +191,26 @@ function App() {
   }
 
   function handleParamDelete(id: string) {
-    const newParams = deletePair(params, id);
-    setParams([...newParams]);
+    const newParams = deletePair(requestParams, id);
+    setRequestParams([...newParams]);
   }
 
   function handleHeaderDelete(id: string) {
-    const newHeaders = deletePair(headers, id);
-    setHeaders([...newHeaders]);
+    const newHeaders = deletePair(requestHeaders, id);
+    setRequestHeaders([...newHeaders]);
   }
 
   return (
-    <div className="app">
-      <form onSubmit={handleSubmit}>
-        <div className="flex p-6 items-center justify-center m-auto">
+    <div className="app flex-col w-[80%] p-2 items-center justify-center m-auto">
+      <form className="mt-5 mb-10" onSubmit={handleSubmit}>
+        <h2 className="text-3xl">Request</h2>
+        <div className="flex items-center justify-center mx-auto my-5">
           <Select
             color="purple"
-            onChange={(method) => setMethod(method!.toString())}
+            onChange={(method) => setRequestMethod(method!.toString())}
             variant="outlined"
             label="Method"
-            value={method}
+            value={requestMethod}
           >
             {options.map((option) => (
               <Option key={option} value={option}>
@@ -159,78 +218,53 @@ function App() {
               </Option>
             ))}
           </Select>
-          <div className="w-[60%]">
+          <div className="w-full">
             <Input
               type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              color="light-blue"
+              value={requestUrl}
+              onChange={(e) => setRequestUrl(e.target.value)}
+              color="deep-purple"
               label="https://example.com"
               className="px-3 text-base"
               variant="outlined"
             />
           </div>
-          <Button type="submit" color="deep-purple">
+          <Button className="w-[200px]" type="submit" color="deep-purple">
             Send
           </Button>
         </div>
         <div className="m-auto">
-          <Tabs value="params">
+          <Tabs value={requestTabs[0].id}>
             <TabsHeader>
-              <Tab value="params">Query params</Tab>
-              <Tab value="headers">Headers</Tab>
-              <Tab value="json">JSON</Tab>
+              {requestTabs.map((tab) => (
+                <Tab key={tab.id} value={tab.id}>
+                  {tab.title}
+                </Tab>
+              ))}
             </TabsHeader>
             <TabsBody>
-              <TabPanel value="params" className="flex justify-center">
-                <div className="flex justify-center items-center flex-col">
-                  {params.map((param) => {
-                    return (
-                      <Pair
-                        key={param._id}
-                        pair={param}
-                        onPairDelete={handleParamDelete}
-                        onPairChange={handleParamChange}
-                      />
-                    );
-                  })}
-                  <Button className="self-start" onClick={handleAddParam}>
-                    Add
-                  </Button>
-                </div>
-              </TabPanel>
-              <TabPanel value="headers" className="flex justify-center">
-                <div className="flex justify-center items-center flex-col">
-                  {headers.map((header) => {
-                    return (
-                      <Pair
-                        key={header._id}
-                        pair={header}
-                        onPairDelete={handleHeaderDelete}
-                        onPairChange={handleHeaderChange}
-                      />
-                    );
-                  })}
-                  <Button className="self-start" onClick={handleAddHeader}>
-                    Add
-                  </Button>
-                </div>
-              </TabPanel>
-              <TabPanel value="json">
-                <ReactCodeMirror
-                  value={json}
-                  extensions={[basicSetup(), jsonLang()]}
-                  onChange={(value, viewUpdate) => setJson(value)}
-                />
-              </TabPanel>
+              {requestTabs.map((tab) => (
+                <TabPanel
+                  className={tab.className + " py-8 min-h-[250px]"}
+                  key={tab.id}
+                  value={tab.id}
+                >
+                  {tab.element}
+                </TabPanel>
+              ))}
             </TabsBody>
           </Tabs>
+          {requestJsonErrorMessage && (
+            <Alert className="w-max pl-6" color="red">
+              {requestJsonErrorMessage}
+            </Alert>
+          )}
         </div>
       </form>
       {response !== undefined && (
-        <div>
-          <h2>Response</h2>
-          <div className="flex gap-5">
+        <div className="min-h-[400px]">
+          <h2 className="text-3xl">Response</h2>
+          <div className="flex gap-5 mb-2 mt-3">
             <p>Status: {response.status}</p>
             <p>Time: {responseTime} ms</p>
             <p>Size: {responseSize}</p>
@@ -253,9 +287,9 @@ function App() {
               </TabPanel>
               <TabPanel value="response-headers" className="flex">
                 <div className="grid grid-cols-2 p-2 gap-x-5">
-                  {responseHeaders.map(({ _id, ...pair }) => {
-                    return <ResponsePair key={_id} pair={pair} />;
-                  })}
+                  {responseHeaders.map(({ _id, ...pair }) => (
+                    <ResponsePair key={_id} pair={pair} />
+                  ))}
                 </div>
               </TabPanel>
             </TabsBody>

@@ -30,6 +30,7 @@ const Pair = ({
     <div className="flex mb-2 gap-2">
       <div className="flex-initial w-[30%]">
         <Input
+          color="deep-purple"
           onChange={handleSetKey}
           error={isError}
           label={isError ? "Key _id isn't allowed" : "Key"}
@@ -38,12 +39,17 @@ const Pair = ({
       </div>
       <div className="flex-initial w-[30%]">
         <Input
+          color="deep-purple"
           onChange={(e) => setValue(e.target.value)}
           label="Value"
           value={pair.value}
         />
       </div>
-      <Button type="button" onClick={() => onPairDelete(pair._id)}>
+      <Button
+        color="deep-purple"
+        type="button"
+        onClick={() => onPairDelete(pair._id)}
+      >
         Remove
       </Button>
     </div>

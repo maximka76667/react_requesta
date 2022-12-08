@@ -19,8 +19,8 @@ const theme = {
       base: {
         container: {
           position: "relative",
-          width: "w-[125px]",
-          minWidth: "min-w-[125px]",
+          width: "w-[150px]",
+          minWidth: "min-w-[150px]",
         },
       },
     },
