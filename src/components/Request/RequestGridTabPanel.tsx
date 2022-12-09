@@ -1,7 +1,7 @@
 import { Button } from "@material-tailwind/react";
 import React from "react";
-import { IPair, IPairWithId } from "../interfaces";
-import Pair from "./Pair";
+import { IPair, IPairWithId } from "../../interfaces";
+import Pair from "../Pair";
 
 export interface RequestGridTabPanelProps {
   pairs: IPairWithId[];

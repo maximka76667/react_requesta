@@ -13,39 +13,41 @@ import {
 import ReactCodeMirror, { basicSetup } from "@uiw/react-codemirror";
 import { json as jsonLang } from "@codemirror/lang-json";
 import { FormEvent, useState } from "react";
-import { Pair, RequestGridTabPanel, ResponsePair } from "./components";
-import { IPairWithId, IPair } from "./interfaces";
+import {
+  RequestGridTabPanel,
+  RequestMethodSelect,
+  ResponsePair,
+} from "./components";
+import { IPair, TResponse } from "./interfaces";
 import { v4 as uuidv4 } from "uuid";
-import axios, { AxiosResponse, AxiosResponseHeaders } from "axios";
-import prettyBytes from "pretty-bytes";
+import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import { EditorView } from "@codemirror/view";
 import { noctisLilac } from "@uiw/codemirror-theme-noctis-lilac";
-
-const options = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+import { deletePair, parseJson } from "./utils";
+import {
+  defaultSelectValue,
+  defaultJsonValue,
+  defaultUrlValue,
+} from "./constants";
+import useResponseData from "./hooks/useResponseData";
+import updatePair from "./utils/updatePair";
+import convertPairs from "./utils/convertPairs";
+import usePairs from "./hooks/usePairs";
 
 function App() {
-  const defaultSelectValue = options[0];
-  const defaultJsonValue = `{\n\t\n}`;
-
+  // Request states
   const [requestMethod, setRequestMethod] = useState(defaultSelectValue);
-  const [requestUrl, setRequestUrl] = useState(
-    "https://jsonplaceholder.typicode.com/todos/1"
-  );
-
-  const [requestParams, setRequestParams] = useState<IPairWithId[]>([
-    { _id: uuidv4() },
-  ]);
-  const [requestHeaders, setRequestHeaders] = useState<IPairWithId[]>([
-    { _id: uuidv4() },
-  ]);
+  const [requestUrl, setRequestUrl] = useState(defaultUrlValue);
+  const [requestParams, setRequestParams] = usePairs();
+  const [requestHeaders, setRequestHeaders] = usePairs();
   const [requestJson, setRequestJson] = useState(defaultJsonValue);
   const [requestJsonErrorMessage, setRequestJsonErrorMessage] = useState("");
 
-  const [response, setResponse] = useState<AxiosResponse<any, any>>();
-  const [responseBody, setResponseBody] = useState(defaultJsonValue);
-  const [responseHeaders, setResponseHeaders] = useState<IPairWithId[]>([]);
+  // Response states
+  const [response, setResponse] = useState<TResponse>(null);
+  const [responseHeaders, responseBody, responseSize] =
+    useResponseData(response);
   const [responseTime, setResponseTime] = useState(0);
-  const [responseSize, setResponseSize] = useState("");
 
   const requestTabs = [
     {
@@ -88,70 +90,60 @@ function App() {
     },
   ];
 
-  type TResponseHeaders =
-    | AxiosResponseHeaders
-    | Partial<
-        Record<string, string | number> & {
-          "set-cookie"?: string[] | undefined;
-        }
-      >;
-
-  function convertHeaders(headers: TResponseHeaders) {
-    return Object.keys(headers).reduce((array: any[], key) => {
-      return [...array, { _id: uuidv4(), key, value: headers[key] }];
-    }, []);
-  }
-
-  function convertPairs(pairs: IPairWithId[]) {
-    return pairs.reduce((object, { _id, ...pair }) => {
-      if (Object.keys(pair).includes("")) return { ...object };
-      return { ...object, ...pair };
-    }, {});
-  }
-
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    console.log(convertPairs(requestParams));
-    console.log(convertPairs(requestHeaders));
+    resetResponse();
 
-    setResponse(undefined);
-    setResponseHeaders([]);
-    setResponseBody(defaultJsonValue);
-    setRequestJsonErrorMessage("");
-
-    const startTime = new Date().getTime();
-
+    // Parse request JSON data
+    // If gives error => invalid json
     let data;
     try {
-      data = JSON.parse(requestJson || defaultJsonValue);
+      data = parseJson(requestJson, defaultJsonValue);
     } catch (e) {
       setRequestJsonErrorMessage("You have to insert valid JSON");
       return;
     }
 
-    axios({
+    const axiosConfig = generateAxiosConfig(data);
+
+    const [response, time] = await fetchUrl(axiosConfig);
+
+    setResponse(response);
+    setResponseTime(time);
+  }
+
+  function resetResponse() {
+    setResponse(null);
+    setRequestJsonErrorMessage("");
+  }
+
+  function generateAxiosConfig(data: any) {
+    return {
       url: requestUrl,
       method: requestMethod,
       params: convertPairs(requestParams),
       headers: convertPairs(requestHeaders),
       data,
-    })
-      .catch((e) => e.response)
-      .then((res) => {
-        const endTime = new Date().getTime();
-        setResponse(res);
-        setResponseHeaders(convertHeaders(res.headers));
-        setResponseBody(JSON.stringify(res.data, null, 2));
-        setResponseTime(endTime - startTime);
-        setResponseSize(
-          prettyBytes(
-            JSON.stringify(res.data).length + JSON.stringify(res.headers).length
-          )
-        );
-      });
+    };
   }
 
-  // Creates a pair template with id
+  async function fetchUrl(
+    axiosConfig: AxiosRequestConfig<any>
+  ): Promise<[AxiosResponse<any, any>, number]> {
+    let response;
+    // startTime and endTime are used to calculate time of request
+    const startTime = new Date().getTime();
+    try {
+      response = await axios(axiosConfig);
+    } catch (e: any) {
+      response = e.response;
+    }
+    const endTime = new Date().getTime();
+    const time = endTime - startTime;
+    return [response, time];
+  }
+
+  // Create a pair template with id
   function createPair() {
     const paramId = uuidv4();
     return { _id: paramId };
@@ -167,37 +159,24 @@ function App() {
     setRequestHeaders([...requestHeaders, newHeader]);
   }
 
-  function updatePair(pairs: IPairWithId[], id: string, pair: IPair) {
-    const newPairs = [...pairs];
-    const index = newPairs.findIndex((p) => p._id === id);
-    newPairs[index] = { _id: id, ...pair };
-    return newPairs;
-  }
-
   function handleParamChange(id: string, pair: IPair) {
     const newParams = updatePair(requestParams, id, pair);
-    setRequestParams([...newParams]);
+    setRequestParams(newParams);
   }
 
   function handleHeaderChange(id: string, pair: IPair) {
     const newHeaders = updatePair(requestHeaders, id, pair);
-    setRequestHeaders([...newHeaders]);
-  }
-
-  function deletePair(pairs: IPairWithId[], id: string) {
-    const pairsCopy = [...pairs];
-    const newPairs = pairsCopy.filter((p, i) => p._id !== id);
-    return newPairs;
+    setRequestHeaders(newHeaders);
   }
 
   function handleParamDelete(id: string) {
     const newParams = deletePair(requestParams, id);
-    setRequestParams([...newParams]);
+    setRequestParams(newParams);
   }
 
   function handleHeaderDelete(id: string) {
     const newHeaders = deletePair(requestHeaders, id);
-    setRequestHeaders([...newHeaders]);
+    setRequestHeaders(newHeaders);
   }
 
   return (
@@ -205,19 +184,10 @@ function App() {
       <form className="mt-5 mb-10" onSubmit={handleSubmit}>
         <h2 className="text-3xl">Request</h2>
         <div className="flex items-center justify-center mx-auto my-5">
-          <Select
-            color="purple"
-            onChange={(method) => setRequestMethod(method!.toString())}
-            variant="outlined"
-            label="Method"
-            value={requestMethod}
-          >
-            {options.map((option) => (
-              <Option key={option} value={option}>
-                {option}
-              </Option>
-            ))}
-          </Select>
+          <RequestMethodSelect
+            onMethodSelect={(method) => setRequestMethod(method!.toString())}
+            selectedRequestMethod={requestMethod}
+          />
           <div className="w-full">
             <Input
               type="url"
@@ -261,7 +231,7 @@ function App() {
           )}
         </div>
       </form>
-      {response !== undefined && (
+      {response && (
         <div className="min-h-[400px]">
           <h2 className="text-3xl">Response</h2>
           <div className="flex gap-5 mb-2 mt-3">
